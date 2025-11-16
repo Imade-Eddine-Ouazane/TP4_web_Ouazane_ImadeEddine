@@ -6,8 +6,9 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.service.AiServices;
 import dev.langchain4j.data.message.SystemMessage;
-
+import dev.langchain4j.rag.RetrievalAugmentor;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 
 @ApplicationScoped
@@ -17,17 +18,19 @@ public class LlmClient {
     private ChatMemory chatMemory;
     private Assistant assistant;
 
+    @Inject
+    private RagTavily ragAvecTavily;
+    private ChatModel model;
+
     /** Constructeur : initialise le modèle Gemini et le service IA */
     public LlmClient() {
 
         String apiKey = System.getenv("GEMINI_API_KEY");
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException(
-                    "Clé API manquante. Définissez GEMINI_KEY  dans vos variables d'environnement."
-            );
+            throw new IllegalStateException("Clé API GEMINI_KEY manquante !");
         }
 
-        ChatModel model = GoogleAiGeminiChatModel.builder()
+        this.model = GoogleAiGeminiChatModel.builder()
                 .apiKey(apiKey)
                 .modelName("gemini-2.5-flash")
                 .temperature(0.7)
@@ -35,10 +38,7 @@ public class LlmClient {
 
         this.chatMemory = MessageWindowChatMemory.withMaxMessages(10);
 
-        this.assistant = AiServices.builder(Assistant.class)
-                .chatModel(model)
-                .chatMemory(chatMemory)
-                .build();
+
 
     }
 
@@ -58,6 +58,13 @@ public class LlmClient {
      * Envoie un prompt (question) au LLM et renvoie la réponse.
      */
     public String ask(String prompt) {
+        RetrievalAugmentor augmentor = ragAvecTavily.getAugmentor(); // 🔹 Récupération du RAG
+
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatModel(model)
+                .chatMemory(chatMemory)
+                .retrievalAugmentor(augmentor) // 🔹 Activation du RAG
+                .build();
         return assistant.chat(prompt);
     }
 
